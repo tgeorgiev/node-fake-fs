@@ -483,3 +483,166 @@ describe('Fake FS', function () {
         })
     })
 })
+
+describe('Fake FS Common tests to verify when resolving to fake root', function() {
+    var fs, cb
+
+    beforeEach(function () {
+        fs = new Fs(true);
+        cb = Cb()
+    })
+
+    describe('.dir(path, [opts])', function () {
+        it('Should define dir', function () {
+            fs.dir('a/b/c').statSync('a/b/c').isDirectory().should.be.true
+        })
+    })
+
+    describe('.file(path, [opts | content, [encoding]]', function () {
+        it('Should define file', function () {
+            fs.file('a/b.txt').statSync('a/b.txt').isFile().should.be.true
+        })
+    })
+
+    describe('.stat()', function () {
+        it('Should return stats', function () {
+            fs.file('a/b/c', {ctime: 123}).stat('a/b/c', cb)
+            cb.result().should.have.property('ctime').equal(123)
+        })
+    })
+
+    describe('.readdir()', function () {
+        it('Should list a dir contents', function () {
+            fs.dir('a').file('b.txt').readdir('.', cb)
+            cb.result().should.eql(['a', 'b.txt'])
+        })
+    })
+
+    describe('.exists()', function () {
+        it('Should return true on existent path', function (done) {
+            fs.dir('asd').exists('asd', function (exists) {
+                exists.should.be.true
+                done()
+            })
+        })
+
+        it('Should return false for non-existent path', function (done) {
+            fs.exists('non-existent', function (exists) {
+                exists.should.be.false
+                done()
+            })
+        })
+    })
+
+    describe('.mkdir()', function () {
+        it('Should create dir', function () {
+            fs.dir('.').mkdir('a', cb)
+            cb.result()
+            fs.statSync('a').isDirectory().should.be.true
+        })
+    })
+
+    describe('.rmdir()', function () {
+        it('Should remove an existing direcory', function () {
+            fs.dir('a/b')
+            fs.rmdirSync('a/b')
+            fs.existsSync('a/b').should.be.false
+        })
+
+        it('Should remove an existing direcory, its subdirectories and files', function () {
+            fs.dir('a/b/c')
+            fs.file('a/b/file.txt')
+            
+            fs.rmdirSync('a/b')
+
+            fs.existsSync('a/b/c').should.be.false
+            fs.existsSync('a/b/file.txt').should.be.false
+            fs.existsSync('a/b').should.be.false
+
+            fs.existsSync('a').should.be.true
+        })
+    })
+
+    describe('.unlink()', function () {
+        it('Should remove an existing file', function () {
+            fs.file('a/file.txt')
+
+            fs.unlinkSync('a/file.txt')
+            
+            fs.existsSync('a/file.txt').should.be.false
+        })
+    })
+
+    describe('.rename()', function () {
+        it('Should rename an existing file', function () {
+            fs.file('a/file.txt')
+
+            fs.renameSync('a/file.txt', 'a/file-new.txt')
+            
+            fs.existsSync('a/file.txt').should.be.false
+            fs.existsSync('a/file-new.txt').should.be.true
+        })
+
+        it('Should rename (move) an existing file', function () {
+            fs.file('a/file.txt')
+            fs.dir('c/d')
+
+            fs.renameSync('a/file.txt', 'c/d/file-new.txt')
+            
+            fs.existsSync('a/file.txt').should.be.false
+            fs.existsSync('c/d/file-new.txt').should.be.true
+        })
+
+        it('Should rename an existing directory', function () {
+            fs.dir('a/b')
+
+            fs.renameSync('a/b', 'a/b-new')
+            
+            fs.existsSync('a/b').should.be.false
+            fs.existsSync('a/b-new').should.be.true
+        })
+
+        it('Should rename (move) an existing directory', function () {
+            fs.dir('a/b')
+            fs.dir('c/d')
+
+            fs.renameSync('a/b', 'c/d/b-new')
+            
+            fs.existsSync('a/b').should.be.false
+            fs.existsSync('c/d/b-new').should.be.true
+        })
+    });
+
+    describe('.readFile()', function () {
+        it('Should read file contents', function () {
+            var content = new Buffer([1, 2, 3])
+            fs.file('bin', content).readFile('bin', cb)
+            cb.result().should.equal(content)
+        })
+
+        it('Should decode file contents', function () {
+            fs.file('file.txt', new Buffer([97])).readFile('file.txt', 'ascii', cb)
+            cb.result().should.equal('a')
+        })
+    })
+
+    describe('.writeFile()', function () {
+        it('Should write file', function () {
+            fs.dir('.').writeFile('a', 'hello', cb)
+            cb.result()
+            fs.readFileSync('a', 'utf8').should.equal('hello')
+        })
+
+        it('Should respect encoding', function () {
+            fs.dir('.').writeFile('a', 'TWFu', 'base64', cb)
+            cb.result()
+            fs.readFileSync('a', 'utf8').should.equal('Man')
+        })
+
+        it('Should allow to write buffers', function () {
+            fs.dir('.').writeFile('a', new Buffer([10]), cb)
+            cb.result()
+            fs.readFileSync('a')[0].should.equal(10)
+        })
+    })
+});
